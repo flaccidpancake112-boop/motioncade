@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motioncade</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #080818;
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            cursor: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* ===== CONNECT SCREEN ===== */
+        #connectScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #080818, #151535);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        #connectScreen h1 {
+            font-size: 3.5em;
+            color: #ff3860;
+            margin-bottom: 5px;
+            text-shadow: 0 0 30px rgba(255, 56, 96, 0.4);
+        }
+
+        #connectScreen .tagline {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+
+        #qrBox {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 40px rgba(255, 56, 96, 0.15);
+        }
+
+        #qrBox canvas {
+            display: block;
+        }
+
+        #roomCode {
+            font-family: 'Courier New', monospace;
+            font-size: 2.2em;
+            color: #00ff88;
+            background: #111133;
+            padding: 12px 30px;
+            border-radius: 10px;
+            letter-spacing: 4px;
+            margin-bottom: 15px;
+            user-select: all;
+        }
+
+        #connectScreen .instructions {
+            color: #555;
+            font-size: 0.95em;
+            text-align: center;
+            line-height: 1.7;
+            max-width: 380px;
+        }
+
+        #connectScreen .waiting {
+            color: #ff3860;
+            margin-top: 25px;
+            font-size: 1.05em;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ===== MODE SELECT ===== */
+        #modeScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #080818, #151535);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 90;
+        }
+
+        #modeScreen h2 {
+            color: white;
+            font-size: 2.5em;
+            margin-bottom: 50px;
+        }
+
+        .modes {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .modeCard {
+            width: 200px;
+            height: 260px;
+            background: #12122a;
+            border: 2px solid #222255;
+            border-radius: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+
+        .modeCard:hover {
+            border-color: #ff3860;
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(255, 56, 96, 0.2);
+        }
+
+        .modeCard .emoji {
+            font-size: 3.5em;
+            margin-bottom: 15px;
+        }
+
+        .modeCard .label {
+            color: white;
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .modeCard .info {
+            color: #777;
+            font-size: 0.85em;
+        }
+
+        /* ===== HUD ===== */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        #scoreText {
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 2.5em;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+        }
+
+        #timerText {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 2em;
+        }
+
+        #comboText {
+            position: absolute;
+            top: 70px;
+            left: 30px;
+            color: #ffcc00;
+            font-family: 'Courier New', monospace;
+            font-size: 1.5em;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        #modeTitle {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff3860;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        /* ===== GAME OVER ===== */
+        #endScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8, 8, 24, 0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 80;
+        }
+
+        #endScreen h2 {
+            font-size: 3em;
+            color: #ff3860;
+            margin-bottom: 15px;
+        }
+
+        #endScore {
+            font-family: 'Courier New', monospace;
+            font-size: 4.5em;
+            color: #00ff88;
+            margin-bottom: 10px;
+        }
+
+        #endHighscore {
+            font-size: 1.1em;
+            color: #888;
+            margin-bottom: 35px;
+        }
+
+        #replayBtn {
+            padding: 15px 45px;
+            font-size: 1.3em;
+            background: transparent;
+            border: 2px solid #ff3860;
+            color: #ff3860;
+            border-radius: 10px;
+            cursor: pointer;
+            pointer-events: all;
+            transition: all 0.2s;
+        }
+
+        #replayBtn:hover {
+            background: #ff3860;
+            color: white;
+        }
+
+        /* ===== FLOATING SCORE ===== */
+        .scorePopup {
+            position: fixed;
+            font-family: 'Courier New', monospace;
+            font-size: 1.6em;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 60;
+            animation: floatAway 0.9s ease-out forwards;
+        }
+
+        @keyframes floatAway {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-70px) scale(1.4);
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- CONNECT SCREEN -->
+<div id="connectScreen">
+    <h1>MOTIONCADE</h1>
+    <p class="tagline">Motion-Controlled Arcade</p>
+    <div id="qrBox"></div>
+    <div id="roomCode">------</div>
+    <p class="instructions">
+        Scan the QR code with your phone<br>
+        OR open <strong>controller.html</strong> on your phone<br>
+        and type the code shown above
+    </p>
+    <p class="waiting">⏳ Waiting for controller...</p>
+</div>
+
+<!-- MODE SELECT -->
+<div id="modeScreen">
+    <h2>CHOOSE YOUR MODE</h2>
+    <div class="modes">
+        <div class="modeCard" onclick="launchGame('shoot')">
+            <div class="emoji">🔫</div>
+            <div class="label">SHOOT</div>
+            <div class="info">Aim & fire at targets</div>
+        </div>
+        <div class="modeCard" onclick="launchGame('fly')">
+            <div class="emoji">✈️</div>
+            <div class="label">FLY</div>
+            <div class="info">Tilt to pilot</div>
+        </div>
+        <div class="modeCard" onclick="launchGame('slash')">
+            <div class="emoji">⚔️</div>
+            <div class="label">SLASH</div>
+            <div class="info">Swing to slice</div>
+        </div>
+    </div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+    <div id="scoreText">Score: 0</div>
+    <div id="comboText">x1</div>
+    <div id="timerText">1:00</div>
+    <div id="modeTitle"></div>
+</div>
+
+<!-- GAME OVER -->
+<div id="endScreen">
+    <h2>TIME'S UP</h2>
+    <div id="endScore">0</div>
+    <div id="endHighscore"></div>
+    <button id="replayBtn" onclick="backToModes()">PLAY AGAIN</button>
+</div>
+
+<!-- GAME CANVAS -->
+<canvas id="canvas"></canvas>
+
+<script>
+/* =============================================
+   CANVAS SETUP
+============================================= */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+/* =============================================
+   GAME STATE
+============================================= */
+let currentMode = null;
+let score = 0;
+let combo = 1;
+let comboTimer = 0;
+let timeLeft = 60;
+let countdown = null;
+let playing = false;
+let highScores = {
+    shoot: parseInt(localStorage.getItem('hs_shoot')) || 0,
+    fly: parseInt(localStorage.getItem('hs_fly')) || 0,
+    slash: parseInt(localStorage.getItem('hs_slash')) || 0
+};
+
+// Phone data
+let phone = {
+    alpha: 0, beta: 0, gamma: 0,
+    ax: 0, ay: 0, az: 0,
+    fire: false, recalibrate: false
+};
+
+// Calibration
+let cal = { beta: 0, gamma: 0, alpha: 0, done: false };
+
+// Cursor
+let rawCursor = { x: 0, y: 0 };
+let cursor = { x: 0, y: 0 };
+
+// Objects
+let targets = [];
+let booms = [];
+let dots = [];
+
+// Fly
+let ship = { x: 0, y: 0, trail: [] };
+let hoops = [];
+
+// Slash
+let fruits = [];
+let blade = [];
+let swinging = false;
+let prevAccel = 0;
+
+// Fire tracking
+let fireWas = false;
+
+/* =============================================
+   PEER CONNECTION
+============================================= */
+let peer = null;
+let conn = null;
+let roomId = '';
+
+function setupPeer() {
+    roomId = 'mc-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    document.getElementById('roomCode').textContent = roomId;
+
+    QRCode.toCanvas(roomId, { width: 180, margin: 2 }, (err, qrCanvas) => {
+        if (!err) document.getElementById('qrBox').appendChild(qrCanvas);
+    });
+
+    peer = new Peer(roomId);
+
+    peer.on('open', () => console.log('Room ready:', roomId));
+
+    peer.on('connection', (connection) => {
+        conn = connection;
+        console.log('Phone connected!');
+
+        conn.on('data', (data) => {
+            phone = data;
+
+            if (!cal.done) {
+                cal.beta = data.beta;
+                cal.gamma = data.gamma;
+                cal.alpha = data.alpha;
+                cal.done = true;
+            }
+
+            if (data.recalibrate) {
+                cal.beta = data.beta;
+                cal.gamma = data.gamma;
+                cal.alpha = data.alpha;
+            }
+
+            mapCursor(data);
+        });
+
+        conn.on('close', () => console.log('Phone disconnected'));
+
+        document.getElementById('connectScreen').style.display = 'none';
+        document.getElementById('modeScreen').style.display = 'flex';
+    });
+
+    peer.on('error', (err) => {
+        console.error(err);
+        document.querySelector('.waiting').textContent = '❌ Error. Refresh page.';
+    });
+}
+
+function mapCursor(data) {
+    let dg = data.gamma - cal.gamma;
+    let db = data.beta - cal.beta;
+
+    rawCursor.x = canvas.width / 2 + (dg / 40) * (canvas.width / 2);
+    rawCursor.y = canvas.height / 2 + (db / 40) * (canvas.height / 2);
+
+    rawCursor.x = Math.max(0, Math.min(canvas.width, rawCursor.x));
+    rawCursor.y = Math.max(0, Math.min(canvas.height, rawCursor.y));
+}
+
+/* =============================================
+   GAME MANAGEMENT
+============================================= */
+function launchGame(mode) {
+    currentMode = mode;
+    score = 0;
+    combo = 1;
+    comboTimer = 0;
+    timeLeft = 60;
+    playing = true;
+    targets = [];
+    booms = [];
+    dots = [];
+    fruits = [];
+    blade = [];
+    hoops = [];
+    ship.trail = [];
+    cal.done = false;
+
+    document.getElementById('modeScreen').style.display = 'none';
+    document.getElementById('endScreen').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('modeTitle').textContent = mode.toUpperCase();
+    document.getElementById('scoreText').textContent = 'Score: 0';
+    document.getElementById('timerText').textContent = '1:00';
+
+    if (mode === 'fly') {
+        ship.x = canvas.width / 2;
+        ship.y = canvas.height / 2;
+        makeHoops();
+    }
+
+    if (countdown) clearInterval(countdown);
+    countdown = setInterval(() => {
+        timeLeft--;
+        let m = Math.floor(timeLeft / 60);
+        let s = timeLeft % 60;
+        document.getElementById('timerText').textContent = m + ':' + String(s).padStart(2, '0');
+        if (timeLeft <= 0) finishGame();
+    }, 1000);
+}
+
+function finishGame() {
+    playing = false;
+    if (countdown) clearInterval(countdown);
+
+    // Save high score
+    if (score > highScores[currentMode]) {
+        highScores[currentMode] = score;
+        localStorage.setItem('hs_' + currentMode, score);
+    }
+
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('endScreen').style.display = 'flex';
+    document.getElementById('endScore').textContent = score;
+    document.getElementById('endHighscore').textContent = 'Best: ' + highScores[currentMode];
+}
+
+function backToModes() {
+    document.getElementById('endScreen').style.display = 'none';
+    document.getElementById('modeScreen').style.display = 'flex';
+}
+
+/* =============================================
+   EFFECTS
+============================================= */
+function boom(x, y, r, color) {
+    booms.push({ x, y, r: 5, max: r * 2.5, a: 1, color });
+}
+
+function sparkle(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+        let ang = Math.random() * Math.PI * 2;
+        let spd = 2 + Math.random() * 5;
+        dots.push({
+            x, y,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            r: 2 + Math.random() * 3,
+            color, a: 1
+        });
+    }
+}
+
+function popup(x, y, text, color) {
+    let el = document.createElement('div');
+    el.className = 'scorePopup';
+    el.textContent = text;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.color = color || '#00ff88';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+}
+
+function tickEffects() {
+    for (let i = booms.length - 1; i >= 0; i--) {
+        booms[i].r += 4;
+        booms[i].a -= 0.04;
+        if (booms[i].a <= 0) booms.splice(i, 1);
+    }
+    for (let i = dots.length - 1; i >= 0; i--) {
+        let d = dots[i];
+        d.x += d.vx;
+        d.y += d.vy;
+        d.vy += 0.12;
+        d.a -= 0.025;
+        if (d.a <= 0) dots.splice(i, 1);
+    }
+}
+
+function drawEffects() {
+    booms.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 220, 80, ${b.a})`;
+        ctx.fill();
+    });
+    dots.forEach(d => {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 200, 100, ${d.a})`;
+        ctx.fill();
+    });
+}
+
+/* =============================================
+   SHARED DRAWING
+============================================= */
+function drawBg() {
+    ctx.strokeStyle = '#0e0e28';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 55) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 55) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+}
+
+function drawCrosshair(x, y) {
+    let s = 20;
+    ctx.save();
+    ctx.strokeStyle = '#ff0050';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#ff0050';
+    ctx.shadowBlur = 12;
+
+    ctx.beginPath();
+    ctx.arc(x, y, s, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - s - 10, y); ctx.lineTo(x - s / 2, y);
+    ctx.moveTo(x + s / 2, y); ctx.lineTo(x + s + 10, y);
+    ctx.moveTo(x, y - s - 10); ctx.lineTo(x, y - s / 2);
+    ctx.moveTo(x, y + s / 2); ctx.lineTo(x, y + s + 10);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff0050';
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function updateHUD() {
+    document.getElementById('scoreText').textContent = 'Score: ' + score;
+    let ce = document.getElementById('comboText');
+    if (combo > 1) {
+        ce.textContent = 'x' + combo + ' COMBO';
+        ce.style.opacity = '1';
+        ce.style.color = combo >= 5 ? '#ff4444' : '#ffcc00';
+    } else {
+        ce.style.opacity = '0';
+    }
+}
+
+/* =============================================
+   SHOOT MODE
+============================================= */
+function tickShoot() {
+    let now = Date.now();
+
+    // Spawn
+    if (targets.length < 5 && Math.random() < 0.035) {
+        targets.push({
+            x: 80 + Math.random() * (canvas.width - 160),
+            y: 80 + Math.random() * (canvas.height - 160),
+            r: 25 + Math.random() * 35,
+            hue: Math.random() * 360,
+            born: now,
+            life: 2200 + Math.random() * 1800
+        });
+    }
+
+    // Fire check
+    if (phone.fire && !fireWas) {
+        let hit = false;
+        for (let i = targets.length - 1; i >= 0; i--) {
+            let t = targets[i];
+            let d = Math.hypot(cursor.x - t.x, cursor.y - t.y);
+            if (d < t.r) {
+                let pts = Math.round((50 / t.r) * 100 * combo);
+                score += pts;
+                combo = Math.min(combo + 1, 10);
+                comboTimer = now;
+                boom(t.x, t.y, t.r, null);
+                sparkle(t.x, t.y, null, 12);
+                popup(t.x, t.y, '+' + pts);
+                targets.splice(i, 1);
+                hit = true;
+                break;
+            }
+        }
+        if (!hit) {
+            combo = 1;
+            sparkle(cursor.x, cursor.y, null, 4);
+        }
+    }
+    fireWas = phone.fire;
+
+    // Combo decay
+    if (now - comboTimer > 2000) combo = 1;
+
+    // Remove expired
+    for (let i = targets.length - 1; i >= 0; i--) {
+        if (now - targets[i].born > targets[i].life) {
+            targets.splice(i, 1);
+            combo = 1;
+        }
+    }
+}
+
+function drawShoot() {
+    let now = Date.now();
+    drawBg();
+
+    targets.forEach(t => {
+        let age = (now - t.born) / t.life;
+        let fade = age > 0.7 ? 1 - (age - 0.7) / 0.3 : 1;
+        let p = 1 + Math.sin(now * 0.008) * 0.04;
+
+        ctx.save();
+        ctx.globalAlpha = fade;
+        ctx.translate(t.x, t.y);
+        ctx.scale(p, p);
+
+        // Outer
+        ctx.beginPath();
+        ctx.arc(0, 0, t.r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${t.hue}, 80%, 55%)`;
+        ctx.fill();
+
+        // Inner
+        ctx.beginPath();
+        ctx.arc(0, 0, t.r * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fill();
+
+        // Bullseye
+        ctx.beginPath();
+        ctx.arc(0, 0, t.r * 0.22, 0, Math.PI * 2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+
+        // Timer ring
+        ctx.beginPath();
+        ctx.arc(0, 0, t.r + 6, -Math.PI / 2, -Math.PI / 2 + (1 - age) * Math.PI * 2);
+        ctx.strokeStyle = age > 0.7 ? '#ff3333' : '#00ff88';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.restore();
+    });
+
+    drawCrosshair(cursor.x, cursor.y);
+}
+
+/* =============================================
+   FLY MODE
+============================================= */
+function makeHoops() {
+    hoops = [];
+    for (let i = 0; i < 7; i++) {
+        hoops.push({
+            x: 80 + Math.random() * (canvas.width - 160),
+            y: 80 + Math.random() * (canvas.height - 160),
+            r: 35 + Math.random() * 30,
+            hue: Math.random() * 360,
+            got: false
+        });
+    }
+}
+
+function tickFly() {
+    if (!cal.done) return;
+
+    let dg = phone.gamma - cal.gamma;
+    let db = phone.beta - cal.beta;
+
+    ship.x = canvas.width / 2 + (dg / 40) * (canvas.width / 2);
+    ship.y = canvas.height / 2 + (db / 40) * (canvas.height / 2);
+    ship.x = Math.max(25, Math.min(canvas.width - 25, ship.x));
+    ship.y = Math.max(25, Math.min(canvas.height - 25, ship.y));
+
+    ship.trail.push({ x: ship.x, y: ship.y, a: 1 });
+    if (ship.trail.length > 40) ship.trail.shift();
+    ship.trail.forEach(t => t.a -= 0.025);
+
+    hoops.forEach(h => {
+        if (h.got) return;
+        if (Math.hypot(ship.x - h.x, ship.y - h.y) < h.r) {
+            h.got = true;
+            let pts = 500 * combo;
+            score += pts;
+            combo = Math.min(combo + 1, 10);
+            comboTimer = Date.now();
+            popup(h.x, h.y, '+' + pts);
+            boom(h.x, h.y, h.r, null);
+            sparkle(h.x, h.y, null, 18);
+        }
+    });
+
+    if (hoops.every(h => h.got)) makeHoops();
+    if (Date.now() - comboTimer > 3000) combo = 1;
+}
+
+function drawFly() {
+    drawBg();
+
+    // Trail
+    ship.trail.forEach(t => {
+        if (t.a <= 0) return;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 200, 255, ${t.a})`;
+        ctx.fill();
+    });
+
+    // Hoops
+    hoops.forEach(h => {
+        if (h.got) return;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsl(${h.hue}, 80%, 55%)`;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${h.hue}, 80%, 55%, 0.1)`;
+        ctx.fill();
+    });
+
+    // Ship
+    ctx.save();
+    ctx.translate(ship.x, ship.y);
+    ctx.shadowColor = '#00ccff';
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(-14, -11);
+    ctx.lineTo(-8, 0);
+    ctx.lineTo(-14, 11);
+    ctx.closePath();
+    ctx.fillStyle = '#00ccff';
+    ctx.fill();
+    ctx.restore();
+}
+
+/* =============================================
+   SLASH MODE
+============================================= */
+function tickSlash() {
+    let now = Date.now();
+
+    // Spawn
+    if (fruits.length < 4 && Math.random() < 0.025) {
+        fruits.push({
+            x: 80 + Math.random() * (canvas.width - 160),
+            y: canvas.height + 40,
+            vx: (Math.random() - 0.5) * 4,
+            vy: -(9 + Math.random() * 6),
+            r: 28 + Math.random() * 22,
+            hue: Math.random() * 50 + 10,
+            cut: false,
+            bomb: Math.random() < 0.12
+        });
+    }
+
+    // Physics
+    fruits.forEach(f => {
+        f.x += f.vx;
+        f.y += f.vy;
+        f.vy += 0.16;
+    });
+
+    // Cleanup
+    for (let i = fruits.length - 1; i >= 0; i--) {
+        if (fruits[i].y > canvas.height + 80 || fruits[i].cut) {
+            fruits.splice(i, 1);
+        }
+    }
+
+    // Blade trail
+    blade.push({ x: cursor.x, y: cursor.y, a: 1 });
+    if (blade.length > 18) blade.shift();
+    blade.forEach(b => b.a -= 0.06);
+
+    // Swing detection
+    let accel = Math.sqrt(phone.ax ** 2 + phone.ay ** 2 + phone.az ** 2);
+    let delta = Math.abs(accel - prevAccel);
+    swinging = delta > 5;
+    prevAccel = accel;
+
+    // Hit check
+    if (swinging || phone.fire) {
+        fruits.forEach(f => {
+            if (f.cut) return;
+            if (Math.hypot(cursor.x - f.x, cursor.y - f.y) < f.r + 25) {
+                f.cut = true;
+                if (f.bomb) {
+                    score = Math.max(0, score - 500);
+                    combo = 1;
+                    popup(f.x, f.y, '-500', '#ff4444');
+                    boom(f.x, f.y, 55, null);
+                } else {
+                    let pts = 200 * combo;
+                    score += pts;
+                    combo = Math.min(combo + 1, 10);
+                    comboTimer = now;
+                    popup(f.x, f.y, '+' + pts);
+                    sparkle(f.x, f.y, null, 14);
+                }
+                boom(f.x, f.y, f.r, null);
+            }
+        });
+    }
+
+    if (now - comboTimer > 2000) combo = 1;
+}
+
+function drawSlash() {
+    drawBg();
+
+    // Blade trail
+    if (blade.length > 1) {
+        for (let i = 1; i < blade.length; i++) {
+            let a = blade[i - 1], b = blade[i];
+            if (b.a <= 0) continue;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = swinging
+                ? `rgba(255, 80, 80, ${b.a})`
+                : `rgba(100, 200, 255, ${b.a})`;
+            ctx.lineWidth = swinging ? 5 : 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+    }
+
+    // Fruits
+    fruits.forEach(f => {
+        if (f.cut) return;
+        ctx.save();
+        ctx.translate(f.x, f.y);
+
+        if (f.bomb) {
+            ctx.beginPath();
+            ctx.arc(0, 0, f.r, 0, Math.PI * 2);
+            ctx.fillStyle = '#222';
+            ctx.fill();
+            ctx.strokeStyle = '#ff2222';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.fillStyle = 'white';
+            ctx.font = `${f.r * 0.9}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('💣', 0, 2);
+        } else {
+            ctx.beginPath();
+            ctx.arc(0, 0, f.r, 0, Math.PI * 2);
+            ctx.fillStyle = `hsl(${f.hue}, 90%, 55%)`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(-f.r * 0.2, -f.r * 0.2, f.r * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+            ctx.fill();
+        }
+        ctx.restore();
+    });
+
+    // Cursor dot
+    ctx.beginPath();
+    ctx.arc(cursor.x, cursor.y, swinging ? 22 : 12, 0, Math.PI * 2);
+    ctx.fillStyle = swinging ? 'rgba(255,80,80,0.4)' : 'rgba(100,200,255,0.25)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cursor.x, cursor.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+}
+
+/* =============================================
+   MAIN LOOP
+============================================= */
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Smooth cursor
+    cursor.x += (rawCursor.x - cursor.x) * 0.3;
+    cursor.y += (rawCursor.y - cursor.y) * 0.3;
+
+    if (playing) {
+        if (currentMode === 'shoot') { tickShoot(); drawShoot(); }
+        else if (currentMode === 'fly') { tickFly(); drawFly(); }
+        else if (currentMode === 'slash') { tickSlash(); drawSlash(); }
+
+        tickEffects();
+        drawEffects();
+        updateHUD();
+    }
+
+    requestAnimationFrame(loop);
+}
+
+/* =============================================
+   START
+============================================= */
+setupPeer();
+loop();
+</script>
+</body>
+</html>
